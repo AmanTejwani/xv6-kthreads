@@ -229,6 +229,13 @@ fork(void)
   return pid;
 }
 
+int 
+clone(int (*func)(void *) , void *stack , int flags, void *args)
+{
+  cprintf(" Received the parameters and value of flag is %d \n",flags);
+  return 5;
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
