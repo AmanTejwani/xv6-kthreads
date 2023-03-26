@@ -320,6 +320,8 @@ copyuvm(pde_t *pgdir, uint sz)
   uint pa, i, flags;
   char *mem;
 
+
+// nisarg comments ---> in new function similar to copyuvm function don't do following code (Start)
   if((d = setupkvm()) == 0)
     return 0;
   for(i = 0; i < sz; i += PGSIZE){
@@ -337,6 +339,8 @@ copyuvm(pde_t *pgdir, uint sz)
       goto bad;
     }
   }
+  // nisarg comment (end)
+  // i.e. we need to do following => page tables and page dir will get copied but actual pages will not get copied!!
   return d;
 
 bad:

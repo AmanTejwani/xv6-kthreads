@@ -68,7 +68,9 @@ exec(char *path, char **argv)
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
+	// nisarg comment ---> (start) this code will be useful
   // Push argument strings, prepare rest of stack in ustack.
+  
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
       goto bad;
@@ -86,7 +88,8 @@ exec(char *path, char **argv)
   sp -= (3+argc+1) * 4;
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
-
+	// nisarg comment -----------> (End)
+	
   // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')
