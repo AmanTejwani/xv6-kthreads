@@ -87,12 +87,11 @@ allocproc(void)
 
 found:
   p->state = EMBRYO;
-  p->pid = nextpid++; // nisarg comment => here pid will become thread id
+  p->pid = nextpid++;
 
   release(&ptable.lock);
 
   // Allocate kernel stack.
-  // nisarg comment => this is required
   if((p->kstack = kalloc()) == 0){
     p->state = UNUSED;
     return 0;
@@ -100,11 +99,9 @@ found:
   sp = p->kstack + KSTACKSIZE;
 
   // Leave room for trap frame.
-  // nisarg comment => this is required 
   sp -= sizeof *p->tf;
   p->tf = (struct trapframe*)sp;
 
-  // nisarg comment ----------------> start here some poeces of this need to be changed
   // Set up new context to start executing at forkret,
   // which returns to trapret.
   sp -= 4;
@@ -114,8 +111,6 @@ found:
   p->context = (struct context*)sp;
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
-  // nisarg comment ----------------> end here 
-
   return p;
 }
 
@@ -194,9 +189,6 @@ fork(void)
   }
 
   // Copy process state from proc.
-  // nisarg comment --> similar to this function in clone function add below things
-  // np->pgdir = currproc->pgdir; -----> here pgdir has mappings for kernel stack and user stack hence we need to change it --> i.e. we need to change one page table entry as stack is only page
-  // so instead of using copyuvm --> goto copyuvm
 
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
@@ -284,7 +276,6 @@ exit(void)
 
 
 
-// nisarg comment ----> for new struct write similar wait code for thread
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
