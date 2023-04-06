@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#define CLONE_VM 1
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -225,7 +226,43 @@ int
 clone(int (*func)(void *) , void *stack , int flags, void *args)
 {
   cprintf(" Received the parameters and value of flag is %d \n",flags);
-  return 5;
+  struct proc *curproc = myproc();
+  int pid;
+  struct proc *np;
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+  if (flags & CLONE_VM) {
+    np->pgdir = curproc->pgdir;
+    np->sz = curproc->sz;
+  }
+  else {
+    if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0) {
+      kfree(np->kstack);
+      np->kstack = 0;
+      np->state = UNUSED;
+      return -1;
+    }
+    np->sz = curproc->sz;
+    np->tf->eax = 0;
+  }
+  np->parent = curproc;
+  *np->tf = *curproc->tf;
+  if(copyout(np->pgdir, (uint)stack, args, sizeof(args)) < 0) {
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+  np->tf->esp = (uint)stack + PGSIZE - sizeof(args);
+  np->tf->eax = 0;
+  np->tf->eip = (uint)func;
+  np->tf->esp = (uint)stack;
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+  pid = np->pid;
+  return pid;
 }
 
 // Exit the current process.  Does not return.
