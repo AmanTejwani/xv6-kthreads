@@ -49,6 +49,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int flags;                   // Clone Flags value
 };
 
 // Process memory is laid out contiguously, low addresses first:
@@ -56,3 +57,9 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+#define CLONE_VM 1
+#define CLONE_FS 2
+#define CLONE_FILES 4
+#define CLONE_THREAD 8
+#define PGSIZE 4096

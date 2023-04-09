@@ -7,7 +7,6 @@
 #include "proc.h"
 #include "spinlock.h"
 
-#define CLONE_VM 1
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
@@ -190,7 +189,6 @@ fork(void)
   }
 
   // Copy process state from proc.
-
   if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
@@ -225,16 +223,18 @@ fork(void)
 int 
 clone(int (*func)(void *) , void *stack , int flags, void *args)
 {
-  cprintf(" Received the parameters and value of flag is %d \n",flags);
   struct proc *curproc = myproc();
-  int pid;
+  int i,pid;
   struct proc *np;
   if((np = allocproc()) == 0){
     return -1;
   }
-  if (flags & CLONE_VM) {
+  if(flags)
+    np->flags=flags;
+  else
+    np->flags=0;
+  if (CLONE_VM & flags) {
     np->pgdir = curproc->pgdir;
-    np->sz = curproc->sz;
   }
   else {
     if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0) {
@@ -243,26 +243,81 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
       np->state = UNUSED;
       return -1;
     }
-    np->sz = curproc->sz;
-    np->tf->eax = 0;
   }
+  np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
-  if(copyout(np->pgdir, (uint)stack, args, sizeof(args)) < 0) {
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-  np->tf->esp = (uint)stack + PGSIZE - sizeof(args);
   np->tf->eax = 0;
-  np->tf->eip = (uint)func;
-  np->tf->esp = (uint)stack;
+  int user_stack[2];
+  uint stack_pointer = (uint)stack;
+  user_stack[0] = 0xffffffff;
+  user_stack[1] = (uint)args;
+  stack_pointer -= 8;
+  if (copyout(np->pgdir, stack_pointer, user_stack, 8) < 0)
+    return -1;
+  np->tf->eip=(uint)func; 
+  np->tf->esp=stack_pointer;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  pid = np->pid;
+
+
   acquire(&ptable.lock);
   np->state = RUNNABLE;
   release(&ptable.lock);
-  pid = np->pid;
   return pid;
+}
+
+// Wait for a process with given tid to exit and return its pid.
+// Return -1 if this process has no children.
+int
+join(int tid)
+{
+  struct proc *p;
+  int havekids, pid;
+  struct proc *curproc = myproc();
+
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->parent != curproc)
+        continue;
+      havekids = 1;
+      if(p->state == ZOMBIE && p->pid==tid){
+        // Found one.
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        if(p->flags & CLONE_VM)
+          p->pgdir=0;
+        else
+          freevm(p->pgdir);
+        p->pid = 0;
+        p->flags=0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
 }
 
 // Exit the current process.  Does not return.
