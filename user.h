@@ -25,6 +25,7 @@ int sleep(int);
 int uptime(void);
 int clone(int (*fn)(void *) , void *stack , int flags , void *arg);
 int join (int pid);
+int lseek(int,int,int);
 
 // ulib.c
 int stat(const char*, struct stat*);
