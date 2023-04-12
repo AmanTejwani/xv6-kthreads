@@ -4,8 +4,11 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
-#include "proc.h"
 #include "spinlock.h"
+#include "sleeplock.h"
+#include "proc.h"
+#include "fs.h"
+#include "file.h"
 
 struct {
   struct spinlock lock;
@@ -244,6 +247,23 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
       return -1;
     }
   }
+  if(flags & CLONE_FILES) {
+    for(i = 0; i < NOFILE; i++)
+      if(curproc->ofile[i])
+        np->ofile[i] = filedup(curproc->ofile[i]);
+  }
+  else {
+    for(i =0;i < NOFILE;i++) {
+      if(curproc->ofile[i]){
+        np->ofile[i] = filealloc();
+        np->ofile[i]->readable = curproc->ofile[i]->readable;
+        np->ofile[i]->writable = curproc->ofile[i]->writable;
+        np->ofile[i]->off = 0;
+        np->ofile[i]->type = curproc->ofile[i]->type;
+        np->ofile[i]->ip = idup(curproc->ofile[i]->ip);
+      }
+    }
+  }
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -257,10 +277,6 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
     return -1;
   np->tf->eip=(uint)func; 
   np->tf->esp=stack_pointer;
-
-  for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
-      np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   pid = np->pid;
