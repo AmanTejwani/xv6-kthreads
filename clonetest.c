@@ -37,7 +37,7 @@ int main(){
     }
     int x=join(tid);
     if(x==tid)
-        printf(1,"Joined Successfully \n");
+        printf(1,"Joined Successfully for tid %d \n",x);
 
     flags=CLONE_FILES;
     int fd = open("test.txt",O_CREATE | O_RDWR);
@@ -50,6 +50,6 @@ int main(){
         printf(1, "CLONE_FILES failed\n");
     x=join(tid);
     if(x==tid)
-        printf(1,"Joined Successfully \n");
+        printf(1,"Joined Successfully for tid %d \n",x);
     exit();
 }
