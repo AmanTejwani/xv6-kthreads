@@ -267,13 +267,16 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
       }
     }
   }
+  if(flags & CLONE_FS){
+
+  } 
+  else{
+    np->cwd = idup(curproc->cwd);
+  }
   if(flags & CLONE_THREAD){
     np->tgid=curproc->tgid;
-    np->parent=curproc->parent;
   }
-  else{
-    np->parent=curproc;
-  }
+  np->parent=curproc;
   np->sz = curproc->sz;
   *np->tf = *curproc->tf;
   np->tf->eax = 0;
@@ -286,7 +289,7 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
     return -1;
   np->tf->eip=(uint)func; 
   np->tf->esp=stack_pointer;
-  np->cwd = idup(curproc->cwd);
+  
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   pid = np->pid;
 
@@ -306,7 +309,7 @@ join(int tid)
   int pid;
   struct proc *curproc = myproc();
   cprintf("tid value received in function is   %d \n",tid);
-  // // to avoid deadlock :-calling join on a thread from within its own thread group leader can lead to a deadlock.
+  // to avoid deadlock :-calling join on a thread from within its own thread group leader can lead to a deadlock.
   if(tid==curproc->tgid){
     return -1;
   }
@@ -319,12 +322,10 @@ join(int tid)
   if(!threadLeader){
     threadLeader=curproc;
   }
-  // cprintf("threadLeader->pid  %d and threadLeader ->tgid is %d \n",threadLeader->pid,threadLeader->tgid);
   acquire(&ptable.lock);
   for(;;){
     // Scan through table looking for exited children.
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      // cprintf("p->pid  %d \n",p->pid); 
       if(p->state == ZOMBIE && p->pid==tid){
         cprintf("................Found PROC ..................\n");
         // Found one.
