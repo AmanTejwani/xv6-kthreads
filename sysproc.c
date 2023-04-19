@@ -36,6 +36,21 @@ sys_join(void)
 }
 
 int
+sys_tkill(void)
+{
+  int tid;
+  if(argint(0,&tid)<0)
+    return -1;
+  return tkill(tid);
+}
+
+int
+sys_tgkill(void)
+{
+  return tgkill();
+}
+
+int
 sys_exit(void)
 {
   exit();
@@ -60,6 +75,12 @@ sys_kill(void)
 
 int
 sys_getpid(void)
+{
+  return myproc()->tgid;
+}
+
+int
+sys_gettid(void)
 {
   return myproc()->pid;
 }
