@@ -20,27 +20,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
-  // acquire(&ptable.lock);
-
-  // if(curproc->flags && CLONE_THREAD){
-  //   struct proc *p , *threadLeader=0;
-  //   if(curproc->pid!=curproc->tgid){
-  //     // find thread leader of process
-  //     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-  //       if(p->pid == curproc->tgid && p->tgid == curproc->tgid && p!=curproc){
-  //         threadLeader=p;
-  //         break;
-  //       }
-  //     }
-  //   }
-  //   else if(curproc->pid==curproc->tgid){
-  //     threadLeader=curproc;
-  //   }
-  //   threadLeader->pid=curproc->pid;
-  //   curproc->pid=curproc->tgid;
-  //   tgkill();
-  // }
-  // release(&ptable.lock);
+  changeThreadLeader();
   begin_op();
 
   if((ip = namei(path)) == 0){

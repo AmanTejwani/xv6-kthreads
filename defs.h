@@ -125,6 +125,7 @@ int             join(int);
 int             gettid(void);
 int             tkill(int);
 int             tgkill(void);
+void            changeThreadLeader(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);

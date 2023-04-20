@@ -327,7 +327,6 @@ join(int tid)
     // Scan through table looking for exited children.
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->state == ZOMBIE && p->pid==tid){
-        cprintf("................Found PROC ..................\n");
         // Found one.
         pid = p->pid;
         kfree(p->kstack);
@@ -389,7 +388,7 @@ tgkill(){
   }
   acquire(&ptable.lock);
   for(p= ptable.proc ; p< &ptable.proc[NPROC];p++){
-    if(p->tgid==currproc->pid && p->pid!=currproc->pid){
+    if(p->tgid==currproc->pid && p!=currproc){
       p->killed=1;
     }
     if(p->state==SLEEPING){
@@ -400,7 +399,7 @@ tgkill(){
   for(;;){
     havekids=0;
     for(p= ptable.proc ; p< &ptable.proc[NPROC];p++){
-      if(p->tgid==currproc->pid && p->pid!=currproc->pid){
+      if(p->tgid==currproc->pid && p!=currproc){
         if(p->state == ZOMBIE){
           kfree(p->kstack);
           p->tgid=0;
@@ -758,4 +757,24 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+void
+changeThreadLeader(void){
+  struct proc *p ,*curproc=myproc();
+  acquire(&ptable.lock);
+  if(curproc->pid!=curproc->tgid){
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid==curproc->tgid && p!=curproc){
+        break;
+      }
+    }
+    cprintf("1- p->pid == %d and p->tgid == %d  and curproc->pid == %d && curproc->tgid == %d \n",p->pid,p->tgid,curproc->pid,curproc->tgid);
+    int temp=p->pid;
+    p->pid=curproc->pid;
+    curproc->pid=temp;
+    cprintf("2- p->pid == %d and p->tgid == %d  and curproc->pid == %d && curproc->tgid == %d \n",p->pid,p->tgid,curproc->pid,curproc->tgid);
+  }
+  release(&ptable.lock);
+  tgkill();
 }

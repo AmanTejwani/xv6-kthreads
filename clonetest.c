@@ -7,6 +7,7 @@
 #define CLONE_VM   1
 #define CLONE_FILES   4
 #define CLONE_THREAD 8
+char *argv[] = { "clonethread", 0 };
 int y=15;
 int func(void *arg){
     if(*((int*)arg)==5)
@@ -23,6 +24,7 @@ int func_CLONE_FILES(void *arg){
 }
 int bar(void *arg){
     printf(1,"In main 1 and value of tid is %d and pid is %d  and value of argument is %d \n",gettid(),getpid(),*(int *)arg);
+    exec("clonethread", argv);
     int x=gettid();
     int y=getpid();
     printf(1,"value of tid is %d and value of pid/tgid is  %d \n",x,y);
