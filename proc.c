@@ -450,10 +450,12 @@ exit(void)
     panic("init exiting");
 
   // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
+  if(!(curproc->flags & CLONE_FILES)){
+    for(fd = 0; fd < NOFILE; fd++){
+      if(curproc->ofile[fd]){
+        fileclose(curproc->ofile[fd]);
+        curproc->ofile[fd] = 0;
+      }
     }
   }
 
@@ -755,6 +757,7 @@ procdump(void)
     }
     cprintf("\n");
   }
+
 }
 
 void
@@ -767,11 +770,10 @@ changeThreadLeader(void){
         break;
       }
     }
-    cprintf("1- p->pid == %d and p->tgid == %d  and curproc->pid == %d && curproc->tgid == %d \n",p->pid,p->tgid,curproc->pid,curproc->tgid);
     int temp=p->pid;
     p->pid=curproc->pid;
     curproc->pid=temp;
-    cprintf("2- p->pid == %d and p->tgid == %d  and curproc->pid == %d && curproc->tgid == %d \n",p->pid,p->tgid,curproc->pid,curproc->tgid);
+    curproc->parent=p->parent;
   }
   release(&ptable.lock);
   tgkill();

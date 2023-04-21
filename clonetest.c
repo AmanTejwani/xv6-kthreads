@@ -9,6 +9,20 @@
 #define CLONE_THREAD 8
 char *argv[] = { "clonethread", 0 };
 int y=15;
+struct temp{
+    int a;
+    int b;
+};
+int func_args(void *args)
+{
+    struct temp *var = (struct temp *)args;
+    if((var->a*var->b)==6)
+        printf(1,"Multi  Arg test pass \n");
+    else
+        printf(1,"Multi Arg test fail \n");
+    exit();
+}
+
 int func(void *arg){
     if(*((int*)arg)==5)
         printf(1,"Argument Received Correctly \n");
@@ -23,7 +37,6 @@ int func_CLONE_FILES(void *arg){
     exit();
 }
 int bar(void *arg){
-    printf(1,"In main 1 and value of tid is %d and pid is %d  and value of argument is %d \n",gettid(),getpid(),*(int *)arg);
     exec("clonethread", argv);
     int x=gettid();
     int y=getpid();
@@ -31,50 +44,66 @@ int bar(void *arg){
     exit();
 }
 int foo(void *arg){
-    printf(1,"In main 1 and value of tid is %d and pid is %d  and value of argument is %d \n",gettid(),getpid(),*(int *)arg);
     int args=6;
     char *childStack=(char *)malloc(STACK_SIZE);
     int flags=CLONE_THREAD;
     int tid=clone(bar,childStack+STACK_SIZE,flags,&args);
     sleep(5);
-    int x=join(tid);
-    if(x==tid)
-        printf(1,"Joined Successfully \n");
+    join(tid);
     exit();
 }
-int main(){
+void clonevm(){
     int tid;
     char *childStack=(char *)malloc(STACK_SIZE);
-    char *newChildStack=(char *)malloc(STACK_SIZE);
-    char *thirdchildStack=(char *)malloc(STACK_SIZE);
     int args=5;
     int flags=CLONE_VM;
     tid=clone(func,childStack+STACK_SIZE,flags,&args);
     sleep(5);
-    if(flags & CLONE_VM){
-        if(y==16){
-            printf(1," CLONE_VM  test passed\n",y);
-        }
-        else
-            printf(1," CLONE_VM  test failed\n",y);
+    if(y==16){
+        printf(1," CLONE_VM  test passed\n",y);
     }
-    int x=join(tid);
-    if(x==tid)
-        printf(1,"Joined Successfully for tid %d \n",x);
-    flags=CLONE_THREAD;
-    tid=clone(foo,newChildStack+STACK_SIZE,flags,&args);
-    sleep(10);
-    flags=CLONE_FILES;
+    else
+        printf(1," CLONE_VM  test failed\n",y);
+    join(tid);
+    return;
+}
+void mutiple_Arg(){
+    char *childStack=(char *)malloc(STACK_SIZE);
+    struct temp *tmp = (struct temp *)malloc(sizeof(struct temp));
+    tmp->a = 2;
+    tmp->b = 3;
+    int tid=clone(func_args,childStack+STACK_SIZE,CLONE_VM,tmp);
+    join(tid);
+    return;
+}
+void cloneFile(){
+    char *thirdchildStack=(char *)malloc(STACK_SIZE);
+    int flags=CLONE_FILES;
     int fd = open("test.txt",O_CREATE | O_RDWR);
-    tid=clone(func_CLONE_FILES,thirdchildStack+STACK_SIZE,flags,&fd);
-    sleep(3);
+    int tid=clone(func_CLONE_FILES,thirdchildStack+STACK_SIZE,flags,&fd);
+    sleep(5);
     int z = lseek(fd,0,SEEK_CUR);
     if(z == 5)
         printf(1, "CLONE_FILES passed\n");
     else
         printf(1, "CLONE_FILES failed\n");
-    x=join(tid);
-    if(x==tid)
-        printf(1,"Joined Successfully for tid %d \n",x);
+    join(tid);
+    return;
+}
+void clonethread(){
+    int tid;
+    char *newChildStack=(char *)malloc(STACK_SIZE);
+    int flags=CLONE_THREAD;
+    int args=5;
+    tid=clone(foo,newChildStack+STACK_SIZE,flags,&args);
+    sleep(5);
+    join(tid);
+}
+
+int main(){
+    clonevm();
+    mutiple_Arg();
+    cloneFile();
+    clonethread();
     exit();
 }

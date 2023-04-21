@@ -3,14 +3,7 @@
 #define CLONE_FILES 4
 #define CLONE_THREAD 8
 #define MAX_THREADS 10
-#define PGSIZE 4096
-struct kthread{
-  char *stack;
-  void *args;
-  int tid;
-}kThread;
+#define STACK_SIZE 4096
 
-typedef struct kthread k_Thread;
-
-int thread_create(k_Thread *thread, int (*func)(void *),void *arg);
-int thread_join(k_Thread *thread);
+int thread_create(int (*func)(void *),void *arg);
+int thread_join(int tid);

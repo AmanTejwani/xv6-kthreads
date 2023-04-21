@@ -19,14 +19,12 @@ int vm_func(void *arg){
 
 void vmflag(){
     int arg=5;
-    k_Thread *thread=(k_Thread *)malloc(sizeof(k_Thread));
-    thread->tid=thread_create(thread,vm_func,&arg);
-    printf(1,"vmflag tid is \n");
+    int tid=thread_create(vm_func,&arg);
     if(arg==6){
-        printf(1,"CLONE_VM local test pass for tid  \n");
+        printf(1,"CLONE_VM local var test pass  \n");
     }
     else{
-        printf(1,"CLONE_VM local test fail for tid  \n");
+        printf(1,"CLONE_VM local var test fail \n");
     }
     if(global_var==16){
         printf(1,"CLONE_VM global var test pass\n");
@@ -34,7 +32,7 @@ void vmflag(){
     else{
         printf(1,"CLONE_VM global var test fail\n");
     }
-    thread_join(thread);
+    thread_join(tid);
 }
 
 int tstress_func(void *arg){
@@ -45,11 +43,10 @@ int tstress_func(void *arg){
 
 void thread_stess_test(){
     int num=20;
-    k_Thread* array[num];
+    int array[num];
     int x=20;
     for(int i=0;i<num;i++){
-        array[i]=(k_Thread *)malloc(sizeof(k_Thread));
-        array[i]->tid=thread_create(array[i],tstress_func,&x);
+        array[i]=thread_create(tstress_func,&x);
     }
     for(int i=0;i<num;i++){
         thread_join(array[i]);
@@ -59,8 +56,9 @@ void thread_stess_test(){
     else
         printf(1,"stress test fail \n");
 }
+
 int main(){
     thread_stess_test();
-    // vmflag();
+    vmflag();
     exit();
 }
