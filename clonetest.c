@@ -46,6 +46,7 @@ int main(){
     int tid;
     char *childStack=(char *)malloc(STACK_SIZE);
     char *newChildStack=(char *)malloc(STACK_SIZE);
+    char *thirdchildStack=(char *)malloc(STACK_SIZE);
     int args=5;
     int flags=CLONE_VM;
     tid=clone(func,childStack+STACK_SIZE,flags,&args);
@@ -60,19 +61,18 @@ int main(){
     int x=join(tid);
     if(x==tid)
         printf(1,"Joined Successfully for tid %d \n",x);
-   
     flags=CLONE_THREAD;
     tid=clone(foo,newChildStack+STACK_SIZE,flags,&args);
     sleep(10);
-    // flags=CLONE_FILES;
-    // int fd = open("test.txt",O_CREATE | O_RDWR);
-    // tid=clone(func_CLONE_FILES,newChildStack+STACK_SIZE,flags,&fd);
-    // sleep(3);
-    // int z = lseek(fd,0,SEEK_CUR);
-    // if(z == 5)
-    //     printf(1, "CLONE_FILES passed\n");
-    // else
-    //     printf(1, "CLONE_FILES failed\n");
+    flags=CLONE_FILES;
+    int fd = open("test.txt",O_CREATE | O_RDWR);
+    tid=clone(func_CLONE_FILES,thirdchildStack+STACK_SIZE,flags,&fd);
+    sleep(3);
+    int z = lseek(fd,0,SEEK_CUR);
+    if(z == 5)
+        printf(1, "CLONE_FILES passed\n");
+    else
+        printf(1, "CLONE_FILES failed\n");
     x=join(tid);
     if(x==tid)
         printf(1,"Joined Successfully for tid %d \n",x);

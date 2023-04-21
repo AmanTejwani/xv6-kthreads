@@ -226,7 +226,7 @@ fork(void)
   return pid;
 }
 
-int 
+int
 clone(int (*func)(void *) , void *stack , int flags, void *args)
 {
   struct proc *curproc = myproc();
@@ -269,7 +269,7 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
   }
   if(flags & CLONE_FS){
 
-  } 
+  }
   else{
     np->cwd = idup(curproc->cwd);
   }
@@ -287,9 +287,8 @@ clone(int (*func)(void *) , void *stack , int flags, void *args)
   stack_pointer -= 8;
   if (copyout(np->pgdir, stack_pointer, user_stack, 8) < 0)
     return -1;
-  np->tf->eip=(uint)func; 
+  np->tf->eip=(uint)func;
   np->tf->esp=stack_pointer;
-  
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
   pid = np->pid;
 
@@ -308,7 +307,6 @@ join(int tid)
   struct proc *p ,*threadLeader=0;
   int pid;
   struct proc *curproc = myproc();
-  cprintf("tid value received in function is   %d \n",tid);
   // to avoid deadlock :-calling join on a thread from within its own thread group leader can lead to a deadlock.
   if(tid==curproc->tgid){
     return -1;
@@ -369,7 +367,7 @@ tkill(int tid)
       p->killed=1;
       if(p->state==SLEEPING){
         p->state=RUNNABLE;
-      }   
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -378,7 +376,7 @@ tkill(int tid)
   return -1;
 }
 
-int 
+int
 tgkill(){
   struct proc *currproc=myproc();
   struct proc *p;
@@ -614,7 +612,7 @@ yield(void)
   release(&ptable.lock);
 }
 
-// we will have something similar to this called cloneret 
+// we will have something similar to this called cloneret
 
 
 // A fork child's very first scheduling by scheduler()
