@@ -31,6 +31,7 @@ int C [M][N];
 int Res[M][N]={{28,23,18},{41,34,27},{54,45,36}};
 int global_var=15;
 int c = 0, c1 = 0, c2 = 0, run = 1;
+char *argv[] = { "clonethread", 0 };
 
 int find_maximum_subarray(void *arg) {
     struct thread_data *data = (struct thread_data *) arg;
@@ -151,6 +152,36 @@ int matMul_func(void *arg){
         sum+=A[data->i][n]*B[n][data->j];
     }
     C[data->i][data->j]=sum;
+    exit();
+}
+
+int func_CLONE_FILES(void *arg){
+    int fd = *(int *)arg;
+    lseek(fd, 5, SEEK_CUR);
+    exit();
+}
+
+int func_args(void *args)
+{
+    struct coord *var = (struct coord *)args;
+    if((var->i*var->j)==6)
+        printf(1,"Multi Arg test pass \n");
+    else
+        printf(1,"Multi Arg test fail \n");
+    exit();
+}
+
+int bar(void *arg){
+    exec("clonethread", argv);
+    int x=gettid();
+    int y=getpid();
+    printf(1,"In Bar value of tid is %d and value of pid/tgid is  %d \n",x,y);
+    exit();
+}
+int foo(void *arg){
+    int args=6;
+    int tid=thread_create(bar,&args);
+    thread_join(tid);
     exit();
 }
 
@@ -297,13 +328,13 @@ void maximum_subarray_sum_test(){
     int arr[] = { -2, -5, 6, -2, -3, 1, 5, -6 };
     int n = sizeof(arr) / sizeof(arr[0]);
     struct thread_data data = { arr, 0, n - 1, 0 };
-    int array[4];
-    array[0] = thread_create(find_maximum_subarray, (void *) &data);
-    if(array[0] == -1) {
-        printf(1,"Error: unable to create thread1, %d\n", array[0]);
+    int tid;
+    tid = thread_create(find_maximum_subarray,&data);
+    if(tid == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", tid);
         exit();
-    } 
-    thread_join(array[0]);
+    }
+    thread_join(tid);
     if(data.max_sum == 7){
         printf(1, "Maximum Subarray Sum test passed\n");
     }
@@ -312,7 +343,35 @@ void maximum_subarray_sum_test(){
     }
 }
 
+
+void mutiple_Arg(){
+    struct coord *tmp = (struct coord *)malloc(sizeof(struct coord));
+    tmp->i = 2;
+    tmp->j = 3;
+    int tid=thread_create(func_args,tmp);
+    thread_join(tid);
+}
+
+void cloneFile(){
+    int fd = open("test.txt",O_CREATE | O_RDWR);
+    int tid=thread_create(func_CLONE_FILES,&fd);
+    int z = lseek(fd,0,SEEK_CUR);
+    if(z == 5)
+        printf(1, "CLONE_FILES passed\n");
+    else
+        printf(1, "CLONE_FILES failed\n");
+    thread_join(tid);
+}
+
+void clonethread(){
+    int args=5;
+    int tid=thread_create(foo,&args);
+    thread_join(tid);
+}
+
 int main(){
+    cloneFile();
+    mutiple_Arg();
     kill_test();
     thread_stess_test();
     vmflag();
@@ -320,5 +379,6 @@ int main(){
     matrixmultiplication_test();
     maximum_subarray_sum_test();
     sync_test();
+    clonethread();
     exit();
 }
