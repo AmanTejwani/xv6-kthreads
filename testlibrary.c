@@ -76,12 +76,12 @@ int find_maximum_subarray(void *arg) {
             if(array[0] == -1) {
                 printf(1,"Error: unable to create thread1, %d\n", array[0]);
                 exit();
-            } 
+            }
             array[1] = thread_create(find_maximum_subarray, (void *) &right_data);
             if(array[1] == -1) {
                 printf(1,"Error: unable to create thread2, %d\n", array[1]);
                 exit();
-            } 
+            }
             thread_join(array[0]);
             thread_join(array[1]);
         } else {
@@ -102,7 +102,7 @@ int firstThread(void *arg){
     }
     exit();
 }
-       
+
 int secondThread(void *arg){
     while(run == 1){
         ticketLock_acquire(&lk);
@@ -185,13 +185,26 @@ int foo(void *arg){
     exit();
 }
 
+int fork_func(void *arg){
+    int pid=fork();
+    if(pid<0)
+        printf(1,"Fork test failed \n");
+    if(pid==0){
+        char *argv[]={"echo","Fork test passed"};
+        exec("echo",argv);
+    }else{
+        wait();
+    }
+    exit();
+}
+
 void vmflag(){
     int arg=5;
     int tid=thread_create(vm_func,&arg);
     if(tid == -1) {
         printf(1,"Error: unable to create thread1, %d\n", tid);
         exit();
-    } 
+    }
     if(arg==6){
         printf(1,"CLONE_VM local var test pass  \n");
     }
@@ -213,7 +226,7 @@ void kill_test(){
     if(y == -1) {
         printf(1,"Error: unable to create thread1, %d\n", y);
         exit();
-    } 
+    }
     int ret=thread_exit(y);
     if(ret==-1)
         printf(1,"tkill fail \n");
@@ -253,12 +266,12 @@ void factorial_test(){
     if(array[0] == -1) {
         printf(1,"Error: unable to create thread1, %d\n", array[0]);
         exit();
-    } 
+    }
     array[1]=thread_create(factorial_func,&lim[1]);
     if(array[1] == -1) {
         printf(1,"Error: unable to create thread2, %d\n", array[1]);
         exit();
-    } 
+    }
     for(int i=0;i<2;i++){
         thread_join(array[i]);
     }
@@ -280,7 +293,7 @@ void matrixmultiplication_test(){
             if(tid == -1) {
                 printf(1,"Error: unable to create thread1, %d\n", tid);
                 exit();
-            } 
+            }
             thread_join(tid);
             count++;
       }
@@ -306,12 +319,12 @@ void sync_test(){
     if(array[0] == -1) {
         printf(1,"Error: unable to create thread1, %d\n", array[0]);
         exit();
-    } 
+    }
     array[1]=thread_create(secondThread,0);
     if(array[1] == -1) {
         printf(1,"Error: unable to create thread1, %d\n", array[1]);
         exit();
-    } 
+    }
     run = 0;
     for(int i=0;i<2;i++){
         thread_join(array[i]);
@@ -369,7 +382,13 @@ void clonethread(){
     thread_join(tid);
 }
 
+void forkTest(){
+    int tid=thread_create(fork_func,0);
+    thread_join(tid);
+}
 int main(){
+    printf(1,"........ Clone Test's Starting ........\n");
+    forkTest();
     cloneFile();
     mutiple_Arg();
     kill_test();
