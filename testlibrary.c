@@ -8,6 +8,13 @@
 #define K 2
 #define N 3
 
+struct thread_data {
+    int *arr;
+    int low;
+    int high;
+    int max_sum;
+};
+
 struct coord{
    int i;
    int j;
@@ -24,6 +31,66 @@ int C [M][N];
 int Res[M][N]={{28,23,18},{41,34,27},{54,45,36}};
 int global_var=15;
 int c = 0, c1 = 0, c2 = 0, run = 1;
+
+int find_maximum_subarray(void *arg) {
+    struct thread_data *data = (struct thread_data *) arg;
+    int *arr = data->arr;
+    int low = data->low;
+    int high = data->high;
+    int max_sum = data->max_sum;
+
+    if (low == high) {
+        if (arr[low] > 0) {
+            max_sum = arr[low];
+        } else {
+            max_sum = 0;
+        }
+    } else {
+        int mid = (low + high) / 2;
+        int left_max_sum = 0;
+        int left_sum = 0;
+        for (int i = mid; i >= low; i--) {
+            left_sum += arr[i];
+            if (left_sum > left_max_sum) {
+                left_max_sum = left_sum;
+            }
+        }
+        int right_max_sum = 0;
+        int right_sum = 0;
+        for (int i = mid + 1; i <= high; i++) {
+            right_sum += arr[i];
+            if (right_sum > right_max_sum) {
+                right_max_sum = right_sum;
+            }
+        }
+        int sum = left_max_sum + right_max_sum;
+        if (sum > max_sum) {
+            max_sum = sum;
+        }
+        struct thread_data left_data = { arr, low, mid, max_sum };
+        struct thread_data right_data = { arr, mid + 1, high, max_sum };
+        int array[2];
+        if (data->max_sum < max_sum) {
+            array[0] = thread_create(find_maximum_subarray, (void *) &left_data);
+            if(array[0] == -1) {
+                printf(1,"Error: unable to create thread1, %d\n", array[0]);
+                exit();
+            } 
+            array[1] = thread_create(find_maximum_subarray, (void *) &right_data);
+            if(array[1] == -1) {
+                printf(1,"Error: unable to create thread2, %d\n", array[1]);
+                exit();
+            } 
+            thread_join(array[0]);
+            thread_join(array[1]);
+        } else {
+            find_maximum_subarray((void *) &left_data);
+            find_maximum_subarray((void *) &right_data);
+        }
+    }
+    data->max_sum = max_sum;
+    exit();
+}
 
 int firstThread(void *arg){
     while(run == 1){
@@ -90,6 +157,10 @@ int matMul_func(void *arg){
 void vmflag(){
     int arg=5;
     int tid=thread_create(vm_func,&arg);
+    if(tid == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", tid);
+        exit();
+    } 
     if(arg==6){
         printf(1,"CLONE_VM local var test pass  \n");
     }
@@ -108,6 +179,10 @@ void vmflag(){
 void kill_test(){
     int x=10;
     int y=thread_create(kt_func,&x);
+    if(y == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", y);
+        exit();
+    } 
     int ret=thread_exit(y);
     if(ret==-1)
         printf(1,"tkill fail \n");
@@ -121,6 +196,10 @@ void thread_stess_test(){
     int x=20;
     for(int i=0;i<num;i++){
         array[i]=thread_create(tstress_func,&x);
+        if(array[i] == -1) {
+            printf(1,"Error: unable to create thread1, %d\n", array[i]);
+            exit();
+        }
     }
     for(int i=0;i<num;i++){
         thread_join(array[i]);
@@ -140,7 +219,15 @@ void factorial_test(){
 	lim[1].l = n/2 + 1;
 	lim[1].h = n;
     array[0]=thread_create(factorial_func,&lim[0]);
+    if(array[0] == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", array[0]);
+        exit();
+    } 
     array[1]=thread_create(factorial_func,&lim[1]);
+    if(array[1] == -1) {
+        printf(1,"Error: unable to create thread2, %d\n", array[1]);
+        exit();
+    } 
     for(int i=0;i<2;i++){
         thread_join(array[i]);
     }
@@ -159,6 +246,10 @@ void matrixmultiplication_test(){
             data->i = i;
             data->j = j;
             int tid=thread_create(matMul_func,data);
+            if(tid == -1) {
+                printf(1,"Error: unable to create thread1, %d\n", tid);
+                exit();
+            } 
             thread_join(tid);
             count++;
       }
@@ -181,7 +272,15 @@ void sync_test(){
     int array[2];
     initlock(&lk);
     array[0]=thread_create(firstThread,0);
+    if(array[0] == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", array[0]);
+        exit();
+    } 
     array[1]=thread_create(secondThread,0);
+    if(array[1] == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", array[1]);
+        exit();
+    } 
     run = 0;
     for(int i=0;i<2;i++){
         thread_join(array[i]);
@@ -194,12 +293,32 @@ void sync_test(){
     }
 }
 
+void maximum_subarray_sum_test(){
+    int arr[] = { -2, -5, 6, -2, -3, 1, 5, -6 };
+    int n = sizeof(arr) / sizeof(arr[0]);
+    struct thread_data data = { arr, 0, n - 1, 0 };
+    int array[4];
+    array[0] = thread_create(find_maximum_subarray, (void *) &data);
+    if(array[0] == -1) {
+        printf(1,"Error: unable to create thread1, %d\n", array[0]);
+        exit();
+    } 
+    thread_join(array[0]);
+    if(data.max_sum == 7){
+        printf(1, "Maximum Subarray Sum test passed\n");
+    }
+    else{
+        printf(1, "Maximum Subarray Sum test failed\n");
+    }
+}
+
 int main(){
     kill_test();
     thread_stess_test();
     vmflag();
     factorial_test();
     matrixmultiplication_test();
+    maximum_subarray_sum_test();
     sync_test();
     exit();
 }
