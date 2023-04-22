@@ -363,7 +363,7 @@ tkill(int tid)
   struct proc *p;
   acquire(&ptable.lock);
   for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
-    if(p->pid==tid && p->tgid!=tid && p->tgid==curproc->tgid){
+    if(p->pid==tid && curproc->tgid!=tid && p->tgid==curproc->tgid){
       p->killed=1;
       if(p->state==SLEEPING){
         p->state=RUNNABLE;
@@ -407,6 +407,13 @@ tgkill(){
           p->name[0] = 0;
           p->killed = 0;
           p->state = UNUSED;
+          p->flags=0;
+          for(int fd = 0; fd < NOFILE; fd++){
+            if(p->ofile[fd]){
+              fileclose(p->ofile[fd]);
+              p->ofile[fd] = 0;
+            }
+          }
         }
         else{
           havekids=1;
@@ -450,12 +457,10 @@ exit(void)
     panic("init exiting");
 
   // Close all open files.
-  if(!(curproc->flags & CLONE_FILES)){
-    for(fd = 0; fd < NOFILE; fd++){
-      if(curproc->ofile[fd]){
-        fileclose(curproc->ofile[fd]);
-        curproc->ofile[fd] = 0;
-      }
+  for(fd = 0; fd < NOFILE; fd++){
+    if(curproc->ofile[fd]){
+      fileclose(curproc->ofile[fd]);
+      curproc->ofile[fd] = 0;
     }
   }
 
@@ -512,11 +517,16 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        if(p->flags & CLONE_VM)
+          p->pgdir=0;
+        else
+          freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        p->flags=0;
+        p->tgid=0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
