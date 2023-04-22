@@ -12,10 +12,17 @@ typedef struct threadLib{
     struct threadLib *prev;
     struct threadLib *next;
 }threadLib;
-struct threadLib *head,*tail;
+
+struct ticketLock
+{
+    int ticketNumber;
+};
 
 int thread_create(int (*func)(void *),void *arg);
 int thread_join(int tid);
 int thread_exit(int tid);
 void thread_Add(threadLib *th);
 void thread_delete(int tid);
+void initlock(struct ticketLock *lk);
+void ticketLock_acquire(struct ticketLock *lk);
+void ticketLock_release(struct ticketLock *lk);

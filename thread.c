@@ -2,7 +2,32 @@
 #include "stat.h"
 #include "user.h"
 #include "thread.h"
+struct threadLib *head,*tail;
 
+void initlock(struct ticketLock *lk)
+{
+    lk->ticketNumber = 0;
+}
+static inline int fetch_and_add(int* variable, int value)
+{
+    __asm__ volatile("lock; xaddl %0, %1"
+      : "+r" (value), "+m" (*variable) // input + output
+      : // No input-only
+      : "memory"
+    );
+    return value;
+}
+void ticketLock_acquire(struct ticketLock *lk)
+{
+    while (fetch_and_add(&lk->ticketNumber, 1) != 0)
+        ;
+    __sync_synchronize();
+}
+void ticketLock_release(struct ticketLock *lk)
+{
+    __sync_synchronize();
+    lk->ticketNumber = 0;
+}
 void thread_Add(threadLib *th){
     if(!head){
         head=th;

@@ -12,16 +12,39 @@ struct coord{
    int i;
    int j;
 };
+struct limits {
+	int l, h, res;
+};
+
+struct ticketLock lk;
 
 int A [M][K] = { {1,4}, {2,5}, {3,6} };
 int B [K][N] = { {8,7,6}, {5,4,3} };
 int C [M][N];
 int Res[M][N]={{28,23,18},{41,34,27},{54,45,36}};
-struct limits {
-	int l, h, res;
-};
-
 int global_var=15;
+int c = 0, c1 = 0, c2 = 0, run = 1;
+
+int firstThread(void *arg){
+    while(run == 1){
+        ticketLock_acquire(&lk);
+        c++;
+        ticketLock_release(&lk);
+        c1++;
+    }
+    exit();
+}
+       
+int secondThread(void *arg){
+    while(run == 1){
+        ticketLock_acquire(&lk);
+        c++;
+        ticketLock_release(&lk);
+        c2++;
+    }
+    exit();
+}
+
 int vm_func(void *arg){
     if(*((int*)arg)==5){
         (*(int*)arg)++;
@@ -30,6 +53,37 @@ int vm_func(void *arg){
     else
         printf(1,"Argument Not Received Correctly \n");
     global_var++;
+    exit();
+}
+
+int kt_func(void *arg){
+    (*(int*)arg)++;
+    for(;;);
+    exit();
+}
+
+int tstress_func(void *arg){
+    (*(int*)arg)++;
+    for(int i=0;i<100;i++);
+    exit();
+}
+
+int factorial_func(void *arg) {
+	struct limits *p = (struct limits *)arg;
+	int prod = 1, k;
+	for(k = p->l; k <= p->h; k++)
+		prod *= k;
+	p->res = prod;
+	exit();
+}
+
+int matMul_func(void *arg){
+    struct coord *data=(struct coord *)arg;
+    int n,sum=0;
+    for(n=0;n<K;n++){
+        sum+=A[data->i][n]*B[n][data->j];
+    }
+    C[data->i][data->j]=sum;
     exit();
 }
 
@@ -51,10 +105,14 @@ void vmflag(){
     thread_join(tid);
 }
 
-int tstress_func(void *arg){
-    (*(int*)arg)++;
-    for(int i=0;i<100;i++);
-    exit();
+void kill_test(){
+    int x=10;
+    int y=thread_create(kt_func,&x);
+    int ret=thread_exit(y);
+    if(ret==-1)
+        printf(1,"tkill fail \n");
+    else
+        printf(1,"tkill pass \n");
 }
 
 void thread_stess_test(){
@@ -71,15 +129,6 @@ void thread_stess_test(){
         printf(1,"stress test pass \n");
     else
         printf(1,"stress test fail \n");
-}
-
-int factorial_func(void *arg) {
-	struct limits *p = (struct limits *)arg;
-	int prod = 1, k;
-	for(k = p->l; k <= p->h; k++)
-		prod *= k;
-	p->res = prod;
-	exit();
 }
 
 void factorial_test(){
@@ -100,16 +149,6 @@ void factorial_test(){
         printf(1, "Factorial test passed \n");
     else
         printf(1,"Factorial Test Failed \n");
-}
-
-int matMul_func(void *arg){
-    struct coord *data=(struct coord *)arg;
-    int n,sum=0;
-    for(n=0;n<K;n++){
-        sum+=A[data->i][n]*B[n][data->j];
-    }
-    C[data->i][data->j]=sum;
-    exit();
 }
 
 void matrixmultiplication_test(){
@@ -133,15 +172,34 @@ void matrixmultiplication_test(){
         }
     }
     if(flag)
-        printf(1, "Matric Multiplication test pass \n");
+        printf(1, "Matrix Multiplication test pass \n");
     else
-        printf(1, "Matric Multiplication test fail \n");
+        printf(1, "Matrix Multiplication test fail \n");
+}
+
+void sync_test(){
+    int array[2];
+    initlock(&lk);
+    array[0]=thread_create(firstThread,0);
+    array[1]=thread_create(secondThread,0);
+    run = 0;
+    for(int i=0;i<2;i++){
+        thread_join(array[i]);
+    }
+    if(c==c1+c2){
+        printf(1, "Ticket Lock Passed\n");
+    }
+    else{
+        printf(1, "Ticket Lock failed\n");
+    }
 }
 
 int main(){
+    kill_test();
     thread_stess_test();
     vmflag();
     factorial_test();
     matrixmultiplication_test();
+    sync_test();
     exit();
 }
