@@ -6,6 +6,8 @@
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+#include "spinlock.h"
+#include "sleeplock.h"
 
 int
 exec(char *path, char **argv)
@@ -18,7 +20,7 @@ exec(char *path, char **argv)
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
-
+  changeThreadLeader();
   begin_op();
 
   if((ip = namei(path)) == 0){
@@ -86,7 +88,6 @@ exec(char *path, char **argv)
   sp -= (3+argc+1) * 4;
   if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
     goto bad;
-
   // Save program name for debugging.
   for(last=s=path; *s; s++)
     if(*s == '/')

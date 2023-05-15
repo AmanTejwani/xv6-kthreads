@@ -4,8 +4,11 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
-#include "proc.h"
 #include "spinlock.h"
+#include "proc.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 
 struct {
   struct spinlock lock;
@@ -112,6 +115,8 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  //setup the tgid as its pid, i.e. thread/process is itself a group leader
+  p->tgid=p->pid;
   return p;
 }
 
@@ -221,6 +226,214 @@ fork(void)
   return pid;
 }
 
+int
+clone(int (*func)(void *) , void *stack , int flags, void *args)
+{
+  struct proc *curproc = myproc();
+  int i,pid;
+  struct proc *np;
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+  if(flags)
+    np->flags=flags;
+  else
+    np->flags=0;
+  if (CLONE_VM & flags) {
+    np->pgdir = curproc->pgdir;
+  }
+  else {
+    if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0) {
+      kfree(np->kstack);
+      np->kstack = 0;
+      np->state = UNUSED;
+      return -1;
+    }
+  }
+  if(flags & CLONE_FILES) {
+    for(i = 0; i < NOFILE; i++)
+      if(curproc->ofile[i])
+        np->ofile[i] = filedup(curproc->ofile[i]);
+  }
+  else {
+    for(i =0;i < NOFILE;i++) {
+      if(curproc->ofile[i]){
+        np->ofile[i] = filealloc();
+        np->ofile[i]->readable = curproc->ofile[i]->readable;
+        np->ofile[i]->writable = curproc->ofile[i]->writable;
+        np->ofile[i]->off = 0;
+        np->ofile[i]->type = curproc->ofile[i]->type;
+        np->ofile[i]->ip = idup(curproc->ofile[i]->ip);
+      }
+    }
+  }
+  if(flags & CLONE_FS){
+
+  }
+  else{
+    np->cwd = idup(curproc->cwd);
+  }
+  if(flags & CLONE_THREAD){
+    np->tgid=curproc->tgid;
+  }
+  np->parent=curproc;
+  np->sz = curproc->sz;
+  *np->tf = *curproc->tf;
+  np->tf->eax = 0;
+  int user_stack[2];
+  uint stack_pointer = (uint)stack;
+  user_stack[0] = 0xffffffff;
+  user_stack[1] = (uint)args;
+  stack_pointer -= 8;
+  if (copyout(np->pgdir, stack_pointer, user_stack, 8) < 0)
+    return -1;
+  np->tf->eip=(uint)func;
+  np->tf->esp=stack_pointer;
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  pid = np->pid;
+
+
+  acquire(&ptable.lock);
+  np->state = RUNNABLE;
+  release(&ptable.lock);
+  return pid;
+}
+
+// Wait for a process with given tid to exit and return its pid.
+// Return -1 if this process has no children.
+int
+join(int tid)
+{
+  struct proc *p ,*threadLeader=0;
+  int pid;
+  struct proc *curproc = myproc();
+  // to avoid deadlock :-calling join on a thread from within its own thread group leader can lead to a deadlock.
+  if(tid==curproc->tgid){
+    return -1;
+  }
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid==curproc->tgid){
+      threadLeader=p;
+      break;
+    }
+  }
+  if(!threadLeader){
+    threadLeader=curproc;
+  }
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for exited children.
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->state == ZOMBIE && p->pid==tid){
+        // Found one.
+        pid = p->pid;
+        kfree(p->kstack);
+        p->kstack = 0;
+        if(p->flags & CLONE_VM)
+          p->pgdir=0;
+        else
+          freevm(p->pgdir);
+        p->pid = 0;
+        p->flags=0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->tgid=0;
+        p->state = UNUSED;
+        release(&ptable.lock);
+        return pid;
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(threadLeader, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+int
+tkill(int tid)
+{
+  struct proc *curproc=myproc();
+  struct proc *p;
+  acquire(&ptable.lock);
+  for(p=ptable.proc;p<&ptable.proc[NPROC];p++){
+    if(p->pid==tid && curproc->tgid!=tid && p->tgid==curproc->tgid){
+      p->killed=1;
+      if(p->state==SLEEPING){
+        p->state=RUNNABLE;
+      }
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+int
+tgkill(){
+  struct proc *currproc=myproc();
+  struct proc *p;
+  int havekids;
+  if(currproc->tgid!=currproc->pid){
+    return -1;
+  }
+  acquire(&ptable.lock);
+  for(p= ptable.proc ; p< &ptable.proc[NPROC];p++){
+    if(p->tgid==currproc->pid && p!=currproc){
+      p->killed=1;
+    }
+    if(p->state==SLEEPING){
+      p->state=RUNNABLE;
+      // p->chan=0;
+    }
+  }
+  for(;;){
+    havekids=0;
+    for(p= ptable.proc ; p< &ptable.proc[NPROC];p++){
+      if(p->tgid==currproc->pid && p!=currproc){
+        if(p->state == ZOMBIE){
+          kfree(p->kstack);
+          p->tgid=0;
+          p->kstack = 0;
+          p->pid = 0;
+          p->parent = 0;
+          p->name[0] = 0;
+          p->killed = 0;
+          p->state = UNUSED;
+          p->flags=0;
+          for(int fd = 0; fd < NOFILE; fd++){
+            if(p->ofile[fd]){
+              fileclose(p->ofile[fd]);
+              p->ofile[fd] = 0;
+            }
+          }
+        }
+        else{
+          havekids=1;
+          break;
+        }
+      }
+    }
+    if(!havekids){
+      break;
+    }
+    if(currproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+    sleep(currproc,&ptable.lock);
+  }
+  release(&ptable.lock);
+  return 0;
+}
+
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
@@ -228,7 +441,16 @@ void
 exit(void)
 {
   struct proc *curproc = myproc();
-  struct proc *p;
+  struct proc *p , *threadLeader=0;
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid==curproc->tgid){
+      threadLeader=p;
+      break;
+    }
+  }
+  if(!threadLeader){
+    threadLeader=curproc;
+  }
   int fd;
 
   if(curproc == initproc)
@@ -249,12 +471,15 @@ exit(void)
 
   acquire(&ptable.lock);
 
+  if(curproc->pid!=curproc->tgid){
+    wakeup1(threadLeader);
+  }
   // Parent might be sleeping in wait().
   wakeup1(curproc->parent);
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-    if(p->parent == curproc){
+    if(p->parent == curproc && p->pid==p->tgid){
       p->parent = initproc;
       if(p->state == ZOMBIE)
         wakeup1(initproc);
@@ -266,6 +491,9 @@ exit(void)
   sched();
   panic("zombie exit");
 }
+
+
+
 
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
@@ -289,11 +517,16 @@ wait(void)
         pid = p->pid;
         kfree(p->kstack);
         p->kstack = 0;
-        freevm(p->pgdir);
+        if(p->flags & CLONE_VM)
+          p->pgdir=0;
+        else
+          freevm(p->pgdir);
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;
         p->killed = 0;
+        p->flags=0;
+        p->tgid=0;
         p->state = UNUSED;
         release(&ptable.lock);
         return pid;
@@ -390,6 +623,9 @@ yield(void)
   sched();
   release(&ptable.lock);
 }
+
+// we will have something similar to this called cloneret
+
 
 // A fork child's very first scheduling by scheduler()
 // will swtch here.  "Return" to user space.
@@ -531,4 +767,24 @@ procdump(void)
     }
     cprintf("\n");
   }
+
+}
+
+void
+changeThreadLeader(void){
+  struct proc *p ,*curproc=myproc();
+  acquire(&ptable.lock);
+  if(curproc->pid!=curproc->tgid){
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->pid==curproc->tgid && p!=curproc){
+        break;
+      }
+    }
+    int temp=p->pid;
+    p->pid=curproc->pid;
+    curproc->pid=temp;
+    curproc->parent=p->parent;
+  }
+  release(&ptable.lock);
+  tgkill();
 }
